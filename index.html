@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Travel Inspiration Explorer</title>
+  <!-- Vue.js 3 CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <!-- Bootstrap CSS CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+      <div class="container">
+        <a class="navbar-brand fw-bold" href="#">
+          <i class="fas fa-globe-americas me-2"></i>
+          Travel Explorer
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto">
+            <li class="nav-item">
+              <a class="nav-link" @click="activeTab = 'explore'" :class="{ active: activeTab === 'explore' }" href="#">
+                <i class="fas fa-search me-1"></i> Explore
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" @click="activeTab = 'favorites'" :class="{ active: activeTab === 'favorites' }" href="#">
+                <i class="fas fa-heart me-1"></i> Favorites ({{ favorites.length }})
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" @click="activeTab = 'planner'" :class="{ active: activeTab === 'planner' }" href="#">
+                <i class="fas fa-calendar me-1"></i> Trip Planner
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-section" v-show="activeTab === 'explore'">
+      <div class="hero-overlay">
+        <div class="container text-center text-white">
+          <h1 class="display-3 fw-bold mb-4">Discover Your Next Adventure</h1>
+          <p class="lead mb-4">Explore amazing destinations around the world and plan your perfect trip</p>
+          <div class="row justify-content-center">
+            <div class="col-md-8">
+              <div class="search-bar">
+                <div class="input-group input-group-lg">
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    placeholder="Search destinations..."
+                    v-model="searchQuery"
+                    @input="searchDestinations"
+                  >
+                  <button class="btn btn-success" type="button">
+                    <i class="fas fa-search"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Explore Tab Content -->
+    <div v-show="activeTab === 'explore'">
+      <!-- Filters -->
+      <section class="py-4 bg-light">
+        <div class="container">
+          <div class="row align-items-center">
+            <div class="col-md-6">
+              <h5 class="mb-3 mb-md-0">Filter by Region:</h5>
+            </div>
+            <div class="col-md-6">
+              <div class="btn-group flex-wrap" role="group">
+                <button 
+                  v-for="region in regions" 
+                  :key="region"
+                  type="button" 
+                  class="btn btn-outline-primary btn-sm"
+                  :class="{ active: selectedRegion === region }"
+                  @click="filterByRegion(region)"
+                >
+                  {{ region }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Destinations Grid -->
+      <section class="py-5">
+        <div class="container">
+          <div class="row">
+            <div class="col-12 mb-4">
+              <h2 class="text-center">
+                {{ filteredDestinations.length }} 
+                {{ selectedRegion === 'All' ? 'Amazing' : selectedRegion }} 
+                Destinations
+              </h2>
+            </div>
+          </div>
+          
+          <div class="row g-4">
+            <div 
+              v-for="destination in paginatedDestinations" 
+              :key="destination.id"
+              class="col-lg-4 col-md-6"
+            >
+              <div class="destination-card card h-100 shadow-sm">
+                <div class="position-relative">
+                  <img :src="destination.image" :alt="destination.name" class="card-img-top">
+                  <button 
+                    class="btn btn-light position-absolute top-0 end-0 m-2 rounded-circle favorite-btn"
+                    @click="toggleFavorite(destination)"
+                    :class="{ 'btn-danger': isFavorite(destination.id), 'btn-light': !isFavorite(destination.id) }"
+                  >
+                    <i class="fas fa-heart" :class="{ 'text-white': isFavorite(destination.id), 'text-muted': !isFavorite(destination.id) }"></i>
+                  </button>
+                </div>
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h5 class="card-title">{{ destination.name }}</h5>
+                    <div class="rating">
+                      <i v-for="n in 5" :key="n" class="fas fa-star" :class="{ 'text-warning': n <= destination.rating, 'text-muted': n > destination.rating }"></i>
+                      <small class="text-muted ms-1">{{ destination.rating }}</small>
+                    </div>
+                  </div>
+                  <p class="card-text text-muted mb-2">
+                    <i class="fas fa-map-marker-alt me-1"></i>
+                    {{ destination.country }}, {{ destination.region }}
+                  </p>
+                  <p class="card-text">{{ destination.description }}</p>
+                  <div class="mb-3">
+                    <small class="text-muted">Best time to visit:</small>
+                    <div class="mt-1">
+                      <span 
+                        v-for="month in destination.bestMonths" 
+                        :key="month"
+                        class="badge bg-info me-1"
+                      >
+                        {{ month }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div class="budget-info">
+                      <small class="text-muted">Budget:</small>
+                      <div>
+                        <i v-for="n in 3" :key="n" class="fas fa-dollar-sign" :class="{ 'text-success': n <= destination.budget, 'text-muted': n > destination.budget }"></i>
+                      </div>
+                    </div>
+                    <button 
+                      class="btn btn-primary btn-sm"
+                      @click="addToTrip(destination)"
+                    >
+                      <i class="fas fa-plus me-1"></i>
+                      Add to Trip
+                    </button>
+                  </div>
+                </div>
+                <div class="card-footer bg-transparent">
+                  <div class="d-flex flex-wrap gap-1">
+                    <span 
+                      v-for="activity in destination.activities.slice(0, 3)" 
+                      :key="activity"
+                      class="badge bg-secondary"
+                    >
+                      {{ activity }}
+                    </span>
+                    <span v-if="destination.activities.length > 3" class="badge bg-light text-dark">
+                      +{{ destination.activities.length - 3 }} more
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pagination -->
+          <div class="row mt-5" v-if="totalPages > 1">
+            <div class="col-12">
+              <nav aria-label="Destinations pagination">
+                <ul class="pagination justify-content-center">
+                  <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                    <a class="page-link" @click="currentPage = Math.max(1, currentPage - 1)" href="#">Previous</a>
+                  </li>
+                  <li 
+                    v-for="page in totalPages" 
+                    :key="page"
+                    class="page-item" 
+                    :class="{ active: currentPage === page }"
+                  >
+                    <a class="page-link" @click="currentPage = page" href="#">{{ page }}</a>
+                  </li>
+                  <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                    <a class="page-link" @click="currentPage = Math.min(totalPages, currentPage + 1)" href="#">Next</a>
+                  </li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Favorites Tab Content -->
+    <div v-show="activeTab === 'favorites'" class="py-5">
+      <div class="container">
+        <div class="row">
+          <div class="col-12 text-center mb-5">
+            <h2>Your Favorite Destinations</h2>
+            <p class="text-muted">{{ favorites.length }} destinations saved</p>
+          </div>
+        </div>
+
+        <div v-if="favorites.length === 0" class="text-center py-5">
+          <i class="fas fa-heart fa-3x text-muted mb-3"></i>
+          <h4 class="text-muted">No favorites yet</h4>
+          <p class="text-muted">Start exploring and add destinations to your favorites!</p>
+          <button class="btn btn-primary" @click="activeTab = 'explore'">
+            <i class="fas fa-search me-2"></i>
+            Explore Destinations
+          </button>
+        </div>
+
+        <div class="row g-4" v-else>
+          <div 
+            v-for="destination in favorites" 
+            :key="destination.id"
+            class="col-lg-4 col-md-6"
+          >
+            <div class="destination-card card h-100 shadow-sm">
+              <div class="position-relative">
+                <img :src="destination.image" :alt="destination.name" class="card-img-top">
+                <button 
+                  class="btn btn-danger position-absolute top-0 end-0 m-2 rounded-circle"
+                  @click="toggleFavorite(destination)"
+                >
+                  <i class="fas fa-heart text-white"></i>
+                </button>
+              </div>
+              <div class="card-body">
+                <h5 class="card-title">{{ destination.name }}</h5>
+                <p class="card-text text-muted mb-2">
+                  <i class="fas fa-map-marker-alt me-1"></i>
+                  {{ destination.country }}, {{ destination.region }}
+                </p>
+                <p class="card-text">{{ destination.description }}</p>
+                <button 
+                  class="btn btn-success btn-sm"
+                  @click="addToTrip(destination)"
+                >
+                  <i class="fas fa-plus me-1"></i>
+                  Add to Trip
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trip Planner Tab Content -->
+    <div v-show="activeTab === 'planner'" class="py-5">
+      <div class="container">
+        <div class="row">
+          <div class="col-12 text-center mb-5">
+            <h2>Trip Planner</h2>
+            <p class="text-muted">Plan your perfect journey</p>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-lg-8">
+            <div class="card">
+              <div class="card-header">
+                <h5 class="mb-0">
+                  <i class="fas fa-route me-2"></i>
+                  Your Trip Itinerary ({{ tripDestinations.length }} destinations)
+                </h5>
+              </div>
+              <div class="card-body">
+                <div v-if="tripDestinations.length === 0" class="text-center py-4">
+                  <i class="fas fa-suitcase fa-3x text-muted mb-3"></i>
+                  <h5 class="text-muted">No destinations added yet</h5>
+                  <p class="text-muted">Add destinations from the explore section to start planning your trip!</p>
+                </div>
+
+                <div v-else>
+                  <div 
+                    v-for="(destination, index) in tripDestinations" 
+                    :key="destination.id"
+                    class="trip-item d-flex align-items-center mb-3 p-3 border rounded"
+                  >
+                    <div class="trip-number me-3">
+                      <span class="badge bg-primary rounded-circle">{{ index + 1 }}</span>
+                    </div>
+                    <img :src="destination.image" :alt="destination.name" class="trip-thumb me-3">
+                    <div class="flex-grow-1">
+                      <h6 class="mb-1">{{ destination.name }}</h6>
+                      <small class="text-muted">{{ destination.country }}</small>
+                    </div>
+                    <button 
+                      class="btn btn-outline-danger btn-sm"
+                      @click="removeFromTrip(destination.id)"
+                    >
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+
+                  <div class="mt-4">
+                    <button class="btn btn-success me-2">
+                      <i class="fas fa-download me-1"></i>
+                      Export Itinerary
+                    </button>
+                    <button class="btn btn-outline-secondary" @click="clearTrip">
+                      <i class="fas fa-trash me-1"></i>
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-4">
+            <div class="card">
+              <div class="card-header">
+                <h6 class="mb-0">
+                  <i class="fas fa-info-circle me-2"></i>
+                  Trip Summary
+                </h6>
+              </div>
+              <div class="card-body">
+                <div class="mb-3">
+                  <strong>Total Destinations:</strong> {{ tripDestinations.length }}
+                </div>
+                <div class="mb-3">
+                  <strong>Regions:</strong>
+                  <div class="mt-1">
+                    <span 
+                      v-for="region in uniqueTripRegions" 
+                      :key="region"
+                      class="badge bg-info me-1"
+                    >
+                      {{ region }}
+                    </span>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <strong>Average Budget:</strong>
+                  <div class="mt-1">
+                    <i v-for="n in Math.round(averageBudget)" :key="n" class="fas fa-dollar-sign text-success"></i>
+                  </div>
+                </div>
+                <div class="alert alert-info" v-if="tripDestinations.length > 0">
+                  <small>
+                    <i class="fas fa-lightbulb me-1"></i>
+                    Plan for {{ Math.ceil(tripDestinations.length * 3) }}-{{ Math.ceil(tripDestinations.length * 5) }} days 
+                    to properly explore all destinations!
+                  </small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Success Toast -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+      <div class="toast" ref="toast" role="alert">
+        <div class="toast-header">
+          <i class="fas fa-check-circle text-success me-2"></i>
+          <strong class="me-auto">Success!</strong>
+          <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body">
+          {{ toastMessage }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS Bundle CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Custom JS -->
+  <script src="js/app.js"></script>
+</body>
+</html>
